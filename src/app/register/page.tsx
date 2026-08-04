@@ -1,24 +1,32 @@
 "use client";
 
 import AuthShell from "@/components/auth/AuthShell";
+import { authClient } from "@/lib/auth-client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 export default function RegisterPage() {
+  const router = useRouter();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setMessage("");
     setIsSuccess(false);
 
-    if (name.trim().length < 2) {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (cleanName.length < 2) {
       setMessage("El nombre debe tener al menos 2 caracteres.");
       return;
     }
@@ -33,8 +41,40 @@ export default function RegisterPage() {
       return;
     }
 
-    setIsSuccess(true);
-    setMessage(`Cuenta preparada correctamente para ${name}.`);
+    setIsLoading(true);
+
+    try {
+      const result = await authClient.signUp.email({
+        name: cleanName,
+        email: cleanEmail,
+        password,
+      });
+
+      console.log("Resultado del registro:", result);
+
+      if (result.error) {
+        console.error("Error de Better Auth:", result.error);
+
+        setMessage(
+          result.error.message ||
+            result.error.statusText ||
+            "No fue posible crear la cuenta.",
+        );
+
+        return;
+      }
+
+      setIsSuccess(true);
+      setMessage("Cuenta creada correctamente.");
+
+      setTimeout(() => {
+        router.push("/login");
+      }, 1200);
+    } catch {
+      setMessage("Ocurrió un error inesperado. Intenta nuevamente.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -117,8 +157,12 @@ export default function RegisterPage() {
           />
         </div>
 
-        <button type="submit" className="primary-button">
-          Crear cuenta
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="primary-button disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isLoading ? "Creando cuenta..." : "Crear cuenta"}
         </button>
 
         {message && (
