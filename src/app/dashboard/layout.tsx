@@ -1,16 +1,14 @@
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
 
-type DashboardLayoutProps = {
-  children: ReactNode;
-};
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 
 export default async function DashboardLayout({
   children,
-}: DashboardLayoutProps) {
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -21,14 +19,13 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      <DashboardSidebar
-        userName={session.user.name}
-        userEmail={session.user.email}
-      />
+      <DashboardSidebar />  
 
-      <div className="min-w-0 lg:pl-72">
-        {children}
-      </div>
+      <main className="min-h-screen lg:pl-[17rem]">
+        <div className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-6 lg:px-6 xl:px-8">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

@@ -9,7 +9,6 @@ type DashboardSidebarProps = {
   userName: string;
   userEmail: string;
 };
-
 const navigation = [
   {
     href: "/dashboard",
@@ -17,9 +16,19 @@ const navigation = [
     symbol: "⌂",
   },
   {
+    href: "/dashboard/courses",
+    label: "Cursos",
+    symbol: "▤",
+  },
+  {
     href: "/dashboard/vocabulary",
     label: "Vocabulario",
     symbol: "Aa",
+  },
+  {
+    href: "/dashboard/flashcards",
+    label: "Flashcards",
+    symbol: "▣",
   },
 ];
 

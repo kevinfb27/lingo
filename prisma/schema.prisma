@@ -23,6 +23,9 @@ model User {
   sessions      Session[]
   accounts      Account[]
   vocabularyEntries VocabularyEntry[]
+  courseProgress   UserCourseProgress[]
+  lessonProgress   LessonProgress[]
+  exerciseAttempts ExerciseAttempt[]
   @@unique([email])
   @@map("user")
 }
@@ -80,6 +83,7 @@ model VocabularyEntry {
   id             String   @id @default(cuid())
   word           String
   translation    String
+  alternativeTranslation String?
   pronunciation  String?
   sourceLanguage String
   targetLanguage String
@@ -98,3 +102,167 @@ model VocabularyEntry {
   @@index([isLearned])
   @@map("vocabulary_entry")
 }
+enum ExerciseType {
+  MULTIPLE_CHOICE
+  FILL_BLANK
+  ORDER_WORDS
+  LISTENING_CHOICE
+  TRANSLATION
+}
+
+enum LessonProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Course {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  description    String?
+  sourceLanguage String
+  targetLanguage String
+  level          String
+  order          Int      @default(0)
+  isPublished    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  units    CourseUnit[]
+  progress UserCourseProgress[]
+
+  @@index([sourceLanguage, level])
+  @@map("course")
+}
+
+model CourseUnit {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  order       Int     @default(0)
+
+  courseId String
+course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  lessons Lesson[]
+
+  @@index([courseId])
+  @@unique([courseId, order])
+  @@map("course_unit")
+}
+
+model Lesson {
+  id               String  @id @default(cuid())
+  title            String
+  description      String?
+  order            Int     @default(0)
+  estimatedMinutes Int     @default(10)
+
+  unitId String
+unit   CourseUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  exercises Exercise[]
+  progress  LessonProgress[]
+
+  @@index([unitId])
+  @@unique([unitId, order])
+  @@map("lesson")
+}
+
+model Exercise {
+  id          String       @id @default(cuid())
+  type        ExerciseType
+  instruction String?
+  prompt      String
+  order       Int          @default(0)
+
+  correctAnswer String?
+  audioText     String?
+  explanation   String?
+
+  // Se usa, por ejemplo, para las palabras
+  // desordenadas de ORDER_WORDS.
+  items Json?
+
+  lessonId String
+lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  options  ExerciseOption[]
+  attempts ExerciseAttempt[]
+
+  @@index([lessonId])
+  @@unique([lessonId, order])
+  @@map("exercise")
+}
+
+model ExerciseOption {
+  id        String  @id @default(cuid())
+  text      String
+  isCorrect Boolean @default(false)
+  order     Int     @default(0)
+
+  exerciseId String
+exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([exerciseId])
+  @@unique([exerciseId, order])
+  @@map("exercise_option")
+}
+
+model UserCourseProgress {
+  id       String @id @default(cuid())
+  progress Int    @default(0)
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  userId String
+user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+courseId String
+course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("user_course_progress")
+}
+
+model LessonProgress {
+  id     String               @id @default(cuid())
+  status LessonProgressStatus @default(NOT_STARTED)
+  score  Int                  @default(0)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  userId String
+user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+lessonId String
+lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@map("lesson_progress")
+}
+
+model ExerciseAttempt {
+  id        String   @id @default(cuid())
+  answer    Json
+  isCorrect Boolean
+  createdAt DateTime @default(now())
+
+  userId String
+user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+exerciseId String
+exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([exerciseId])
+  @@map("exercise_attempt")
+}
+

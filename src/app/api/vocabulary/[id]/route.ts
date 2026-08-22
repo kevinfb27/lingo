@@ -24,7 +24,6 @@ export async function PATCH(
   }
 
   const { id } = await context.params;
-  const body = await request.json();
 
   const existingEntry =
     await prisma.vocabularyEntry.findFirst({
@@ -41,17 +40,63 @@ export async function PATCH(
     );
   }
 
+  const body: unknown = await request.json();
+
+  if (
+    typeof body !== "object" ||
+    body === null
+  ) {
+    return NextResponse.json(
+      { error: "Datos no válidos." },
+      { status: 400 }
+    );
+  }
+
   const data: {
     isLearned?: boolean;
     isFavorite?: boolean;
+    alternativeTranslation?: string | null;
   } = {};
 
-  if (typeof body.isLearned === "boolean") {
+  if (
+    "isLearned" in body &&
+    typeof body.isLearned === "boolean"
+  ) {
     data.isLearned = body.isLearned;
   }
 
-  if (typeof body.isFavorite === "boolean") {
+  if (
+    "isFavorite" in body &&
+    typeof body.isFavorite === "boolean"
+  ) {
     data.isFavorite = body.isFavorite;
+  }
+
+  if ("alternativeTranslation" in body) {
+    if (
+      body.alternativeTranslation === null
+    ) {
+      data.alternativeTranslation = null;
+    } else if (
+      typeof body.alternativeTranslation ===
+      "string"
+    ) {
+      const cleanTranslation =
+        body.alternativeTranslation.trim();
+
+      if (cleanTranslation.length > 150) {
+        return NextResponse.json(
+          {
+            error:
+              "La traducción alternativa es demasiado larga.",
+          },
+          { status: 400 }
+        );
+      }
+
+      data.alternativeTranslation =
+        cleanTranslation || null;
+    }
   }
 
   if (Object.keys(data).length === 0) {
