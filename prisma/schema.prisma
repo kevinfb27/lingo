@@ -115,6 +115,13 @@ enum LessonProgressStatus {
   IN_PROGRESS
   COMPLETED
 }
+enum LessonContentType {
+  INTRO
+  VOCABULARY
+  GRAMMAR
+  EXAMPLE
+  TIP
+}
 
 model Course {
   id             String   @id @default(cuid())
@@ -160,14 +167,31 @@ model Lesson {
   estimatedMinutes Int     @default(10)
 
   unitId String
-unit   CourseUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unit   CourseUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
-  exercises Exercise[]
-  progress  LessonProgress[]
+  contentBlocks LessonContentBlock[]
+  exercises     Exercise[]
+  progress      LessonProgress[]
 
   @@index([unitId])
   @@unique([unitId, order])
   @@map("lesson")
+}
+model LessonContentBlock {
+  id    String            @id @default(cuid())
+  type  LessonContentType
+  title String?
+  body  String?
+  order Int               @default(0)
+
+  items Json?
+
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@unique([lessonId, order])
+  @@map("lesson_content_block")
 }
 
 model Exercise {
@@ -177,9 +201,10 @@ model Exercise {
   prompt      String
   order       Int          @default(0)
 
-  correctAnswer String?
-  audioText     String?
-  explanation   String?
+  correctAnswer  String?
+  acceptedAnswers Json?
+  audioText      String?
+  explanation    String?
 
   // Se usa, por ejemplo, para las palabras
   // desordenadas de ORDER_WORDS.

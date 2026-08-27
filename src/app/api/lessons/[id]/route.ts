@@ -18,8 +18,12 @@ export async function GET(
 
   if (!session) {
     return NextResponse.json(
-      { error: "No autorizado." },
-      { status: 401 },
+      {
+        error: "No autorizado.",
+      },
+      {
+        status: 401,
+      },
     );
   }
 
@@ -35,6 +39,12 @@ export async function GET(
         unit: {
           include: {
             course: true,
+          },
+        },
+
+        contentBlocks: {
+          orderBy: {
+            order: "asc",
           },
         },
 
@@ -73,8 +83,12 @@ export async function GET(
 
     if (!lesson) {
       return NextResponse.json(
-        { error: "Lección no encontrada." },
-        { status: 404 },
+        {
+          error: "Lección no encontrada.",
+        },
+        {
+          status: 404,
+        },
       );
     }
 
@@ -82,7 +96,8 @@ export async function GET(
       id: lesson.id,
       title: lesson.title,
       description: lesson.description,
-      estimatedMinutes: lesson.estimatedMinutes,
+      estimatedMinutes:
+        lesson.estimatedMinutes,
 
       status:
         lesson.progress[0]?.status ??
@@ -104,13 +119,27 @@ export async function GET(
           lesson.unit.course.targetLanguage,
       },
 
+      contentBlocks:
+        lesson.contentBlocks.map(
+          (block) => ({
+            id: block.id,
+            type: block.type,
+            title: block.title,
+            body: block.body,
+            order: block.order,
+            items: block.items,
+          }),
+        ),
+
       exercises: lesson.exercises.map(
         (exercise) => ({
           id: exercise.id,
           type: exercise.type,
-          instruction: exercise.instruction,
+          instruction:
+            exercise.instruction,
           prompt: exercise.prompt,
-          audioText: exercise.audioText,
+          audioText:
+            exercise.audioText,
           items: exercise.items,
           options: exercise.options,
         }),
@@ -127,7 +156,9 @@ export async function GET(
         error:
           "No fue posible cargar la lección.",
       },
-      { status: 500 },
+      {
+        status: 500,
+      },
     );
   }
 }

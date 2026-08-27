@@ -8,22 +8,41 @@ type RouteContext = {
   }>;
 };
 
-function normalizeAnswer(
-  value: string,
-) {
+function normalizeAnswer(value: string) {
   return value
     .normalize("NFD")
-    .replace(
-      /[\u0300-\u036f]/g,
-      "",
-    )
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
-    .replace(
-      /[.,!?¿¡;:'"]/g,
-      "",
-    )
+    .replace(/[.,!?¿¡;:'"“”‘’()]/g, "")
     .replace(/\s+/g, " ");
+}
+
+function getAcceptedAnswers(
+  correctAnswer: string | null,
+  acceptedAnswers: unknown,
+) {
+  const answers: string[] = [];
+
+  if (correctAnswer) {
+    answers.push(correctAnswer);
+  }
+
+  if (Array.isArray(acceptedAnswers)) {
+    for (const answer of acceptedAnswers) {
+      if (typeof answer === "string") {
+        answers.push(answer);
+      }
+    }
+  }
+
+  return Array.from(
+    new Set(
+      answers
+        .map((answer) => answer.trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
 export async function POST(
@@ -44,8 +63,7 @@ export async function POST(
   const { id } = await context.params;
 
   try {
-    const body: unknown =
-      await request.json();
+    const body: unknown = await request.json();
 
     if (
       typeof body !== "object" ||
@@ -55,42 +73,37 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            "La respuesta no es válida.",
+          error: "La respuesta no es válida.",
         },
         { status: 400 },
       );
     }
 
-    const answer =
-      body.answer.trim();
+    const answer = body.answer.trim();
 
     if (!answer) {
       return NextResponse.json(
         {
-          error:
-            "Debes responder el ejercicio.",
+          error: "Debes responder el ejercicio.",
         },
         { status: 400 },
       );
     }
 
-    const exercise =
-      await prisma.exercise.findUnique({
-        where: {
-          id,
-        },
+    const exercise = await prisma.exercise.findUnique({
+      where: {
+        id,
+      },
 
-        include: {
-          options: true,
-        },
-      });
+      include: {
+        options: true,
+      },
+    });
 
     if (!exercise) {
       return NextResponse.json(
         {
-          error:
-            "Ejercicio no encontrado.",
+          error: "Ejercicio no encontrado.",
         },
         { status: 404 },
       );
@@ -102,10 +115,8 @@ export async function POST(
       exercise.correctAnswer ?? "";
 
     if (
-      exercise.type ===
-        "MULTIPLE_CHOICE" ||
-      exercise.type ===
-        "LISTENING_CHOICE"
+      exercise.type === "MULTIPLE_CHOICE" ||
+      exercise.type === "LISTENING_CHOICE"
     ) {
       const selectedOption =
         exercise.options.find(
@@ -114,8 +125,7 @@ export async function POST(
         );
 
       isCorrect =
-        selectedOption?.isCorrect ??
-        false;
+        selectedOption?.isCorrect ?? false;
 
       const correctOption =
         exercise.options.find(
@@ -128,11 +138,22 @@ export async function POST(
           correctOption.text;
       }
     } else {
+      const acceptedAnswers =
+        getAcceptedAnswers(
+          exercise.correctAnswer,
+          exercise.acceptedAnswers,
+        );
+
+      const normalizedUserAnswer =
+        normalizeAnswer(answer);
+
       isCorrect =
-        normalizeAnswer(answer) ===
-        normalizeAnswer(
-          exercise.correctAnswer ??
-            "",
+        acceptedAnswers.some(
+          (acceptedAnswer) =>
+            normalizeAnswer(
+              acceptedAnswer,
+            ) ===
+            normalizedUserAnswer,
         );
     }
 

@@ -1,4 +1,5 @@
 "use client";
+import { Volume2 } from "lucide-react";
 import { speakText } from "@/lib/speech";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
@@ -585,22 +586,15 @@ export default function VocabularyManager() {
     }
   }
 
-  async function speakWord(
-  entry: VocabularyEntry,
-) {
-  try {
-    await speakText(
-      entry.word,
-      entry.sourceLanguage,
-    );
-  } catch {
-    setMessage(
-      "Tu navegador no permite reproducir pronunciaciones.",
-    );
+  async function speakWord(entry: VocabularyEntry) {
+    try {
+      await speakText(entry.word, entry.sourceLanguage);
+    } catch {
+      setMessage("Tu navegador no permite reproducir pronunciaciones.");
 
-    setMessageType("error");
+      setMessageType("error");
+    }
   }
-}
 
   return (
     <div className="grid gap-8 xl:grid-cols-[400px_1fr]">
@@ -908,8 +902,11 @@ export default function VocabularyManager() {
                   <button
                     type="button"
                     onClick={() => speakWord(entry)}
-                    className="rounded-xl bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/20"
+                    className="inline-flex  cursor-pointer items-center gap-2 rounded-xl bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/20"
+                    aria-label={`Escuchar pronunciación de ${entry.word}`}
+                    title="Escuchar pronunciación"
                   >
+                    <Volume2 className="h-4 w-4" />
                     Escuchar
                   </button>
 

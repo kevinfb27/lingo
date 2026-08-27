@@ -1,8 +1,9 @@
+import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { headers } from "next/headers";
-import Link from "next/link";
-import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
   const session = await auth.api.getSession({
@@ -14,10 +15,12 @@ export default async function DashboardPage() {
   }
 
   const [
-    totalWords,
-    learnedWords,
-    favoriteWords,
-    recentWords,
+    totalVocabulary,
+    learnedVocabulary,
+    favoriteVocabulary,
+    pendingVocabulary,
+    recentVocabulary,
+    course,
   ] = await Promise.all([
     prisma.vocabularyEntry.count({
       where: {
@@ -39,176 +42,423 @@ export default async function DashboardPage() {
       },
     }),
 
+    prisma.vocabularyEntry.count({
+      where: {
+        userId: session.user.id,
+        isLearned: false,
+      },
+    }),
+
     prisma.vocabularyEntry.findMany({
       where: {
         userId: session.user.id,
       },
+
       orderBy: {
         createdAt: "desc",
       },
-      take: 5,
+
+      take: 4,
+
+      select: {
+        id: true,
+        word: true,
+        translation: true,
+        alternativeTranslation: true,
+      },
+    }),
+
+    prisma.course.findFirst({
+      where: {
+        isPublished: true,
+      },
+
+      orderBy: {
+        order: "asc",
+      },
+
+      include: {
+        units: {
+          orderBy: {
+            order: "asc",
+          },
+
+          include: {
+            lessons: {
+              orderBy: {
+                order: "asc",
+              },
+
+              include: {
+                progress: {
+                  where: {
+                    userId: session.user.id,
+                  },
+
+                  select: {
+                    status: true,
+                    score: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     }),
   ]);
 
-  const pendingWords = totalWords - learnedWords;
+  const lessons =
+    course?.units.flatMap((unit) =>
+      unit.lessons.map((lesson) => ({
+        ...lesson,
+        unitTitle: unit.title,
+      })),
+    ) ?? [];
+
+  const completedLessons = lessons.filter(
+    (lesson) =>
+      lesson.progress[0]?.status === "COMPLETED",
+  ).length;
+
+  const courseProgress =
+    lessons.length === 0
+      ? 0
+      : Math.round(
+          (completedLessons / lessons.length) * 100,
+        );
+
+  const nextLesson =
+    lessons.find(
+      (lesson) =>
+        lesson.progress[0]?.status !== "COMPLETED",
+    ) ??
+    lessons[0] ??
+    null;
+
+  const firstName =
+    session.user.name?.split(" ")[0] ?? "estudiante";
 
   return (
-    <main className="px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
-      <header className="flex flex-col justify-between gap-6 xl:flex-row xl:items-end">
+    <main>
+      {/* ENCABEZADO */}
+      <section className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-semibold text-teal-400">
-            Panel del estudiante
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-cyan-400">
+            LinguaGo
           </p>
 
-          <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
-            Hola, {session.user.name}
+          <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">
+            Hola, {firstName}
           </h1>
 
-          <p className="mt-3 max-w-2xl leading-7 text-slate-400">
-            Continúa aprendiendo y organiza todas
-            las palabras nuevas que encuentres.
+          <p className="mt-3 max-w-2xl text-slate-400">
+            Continúa aprendiendo y mantén tu progreso
+            en movimiento.
           </p>
         </div>
 
         <Link
-          href="/dashboard/vocabulary"
-          className="rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-6 py-3 text-center font-bold text-white shadow-lg shadow-teal-500/20 transition hover:-translate-y-0.5"
+          href="/dashboard/courses"
+          className="inline-flex w-fit items-center justify-center rounded-2xl bg-white/5 px-5 py-3 text-sm font-bold text-slate-300 transition hover:bg-white/10 hover:text-white"
         >
-          Agregar palabra
+          Ver todos los cursos →
         </Link>
-      </header>
-
-      <section className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-3xl border border-white/10 bg-white/5 p-6">
-          <p className="text-sm font-semibold text-slate-400">
-            Palabras guardadas
-          </p>
-
-          <p className="mt-4 text-4xl font-black">
-            {totalWords}
-          </p>
-        </article>
-
-        <article className="rounded-3xl border border-emerald-400/20 bg-emerald-400/5 p-6">
-          <p className="text-sm font-semibold text-emerald-300">
-            Aprendidas
-          </p>
-
-          <p className="mt-4 text-4xl font-black text-emerald-300">
-            {learnedWords}
-          </p>
-        </article>
-
-        <article className="rounded-3xl border border-cyan-400/20 bg-cyan-400/5 p-6">
-          <p className="text-sm font-semibold text-cyan-300">
-            Pendientes
-          </p>
-
-          <p className="mt-4 text-4xl font-black text-cyan-300">
-            {pendingWords}
-          </p>
-        </article>
-
-        <article className="rounded-3xl border border-amber-400/20 bg-amber-400/5 p-6">
-          <p className="text-sm font-semibold text-amber-300">
-            Favoritas
-          </p>
-
-          <p className="mt-4 text-4xl font-black text-amber-300">
-            {favoriteWords}
-          </p>
-        </article>
       </section>
 
-      <section className="mt-10 grid gap-8 xl:grid-cols-[1.4fr_1fr]">
-        <article className="rounded-[2rem] border border-white/10 bg-white/5 p-6 sm:p-8">
+      {/* CONTINUAR APRENDIENDO */}
+      {course && (
+        <section className="mt-8 overflow-hidden rounded-[2rem] border border-cyan-400/15 bg-gradient-to-br from-cyan-400/10 via-white/5 to-emerald-400/5">
+          <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500" />
+
+          <div className="grid gap-7 p-7 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                  {course.level}
+                </span>
+
+                <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs font-bold text-cyan-300">
+                  Continuar aprendiendo
+                </span>
+              </div>
+
+              <h2 className="mt-5 text-2xl font-black text-white">
+                {course.title}
+              </h2>
+
+              {nextLesson && (
+                <div className="mt-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                    Próxima lección
+                  </p>
+
+                  <p className="mt-1 font-bold text-slate-200">
+                    {nextLesson.title}
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {nextLesson.unitTitle} ·{" "}
+                    {nextLesson.estimatedMinutes} min
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-6 max-w-xl">
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="font-semibold text-slate-400">
+                    Progreso del curso
+                  </span>
+
+                  <span className="font-bold text-cyan-300">
+                    {courseProgress}%
+                  </span>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500"
+                    style={{
+                      width: `${courseProgress}%`,
+                    }}
+                  />
+                </div>
+
+                <p className="mt-2 text-xs text-slate-500">
+                  {completedLessons} de {lessons.length}{" "}
+                  lecciones completadas
+                </p>
+              </div>
+            </div>
+
+            {nextLesson ? (
+              <Link
+                href={`/dashboard/courses/${course.slug}/lessons/${nextLesson.id}`}
+                className="inline-flex min-w-44 items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-6 py-3.5 font-bold text-white shadow-lg shadow-cyan-950/20 transition hover:-translate-y-0.5"
+              >
+                {courseProgress > 0
+                  ? "Continuar →"
+                  : "Comenzar →"}
+              </Link>
+            ) : (
+              <Link
+                href={`/dashboard/courses/${course.slug}`}
+                className="inline-flex min-w-44 items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-6 py-3.5 font-bold text-white"
+              >
+                Ver curso →
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ESTADÍSTICAS */}
+      <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DashboardStat
+          value={totalVocabulary}
+          label="Palabras guardadas"
+          detail="Tu vocabulario total"
+          symbol="Aa"
+        />
+
+        <DashboardStat
+          value={learnedVocabulary}
+          label="Aprendidas"
+          detail="Palabras dominadas"
+          symbol="✓"
+        />
+
+        <DashboardStat
+          value={pendingVocabulary}
+          label="Por practicar"
+          detail="Disponibles en flashcards"
+          symbol="▣"
+        />
+
+        <DashboardStat
+          value={favoriteVocabulary}
+          label="Favoritas"
+          detail="Palabras destacadas"
+          symbol="★"
+        />
+      </section>
+
+      {/* CONTENIDO INFERIOR */}
+      <section className="mt-7 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        {/* ACCESOS RÁPIDOS */}
+        <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              Accesos rápidos
+            </p>
+
+            <h2 className="mt-2 text-xl font-black text-white">
+              ¿Qué quieres hacer?
+            </h2>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <QuickAction
+              href="/dashboard/courses"
+              symbol="▤"
+              title="Cursos"
+              description="Continuar aprendiendo"
+            />
+
+            <QuickAction
+              href="/dashboard/vocabulary"
+              symbol="Aa"
+              title="Vocabulario"
+              description="Guardar nuevas palabras"
+            />
+
+            <QuickAction
+              href="/dashboard/flashcards"
+              symbol="▣"
+              title="Flashcards"
+              description="Practicar vocabulario"
+            />
+          </div>
+        </div>
+
+        {/* VOCABULARIO RECIENTE */}
+        <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="font-semibold text-teal-400">
-                Vocabulario reciente
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                Vocabulario
               </p>
 
-              <h2 className="mt-1 text-2xl font-black">
-                Últimas palabras
+              <h2 className="mt-2 text-xl font-black text-white">
+                Palabras recientes
               </h2>
             </div>
 
             <Link
               href="/dashboard/vocabulary"
-              className="text-sm font-semibold text-teal-400 hover:text-teal-300"
+              className="text-sm font-bold text-cyan-400 transition hover:text-cyan-300"
             >
-              Ver todas
+              Ver todo
             </Link>
           </div>
 
-          {recentWords.length === 0 ? (
-            <div className="mt-8 rounded-3xl border border-dashed border-white/15 p-10 text-center">
-              <p className="text-lg font-bold">
-                Todavía no tienes palabras guardadas
+          {recentVocabulary.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-dashed border-white/10 p-6 text-center">
+              <p className="text-sm text-slate-500">
+                Todavía no has agregado palabras.
               </p>
 
-              <p className="mt-2 text-slate-500">
-                Agrega la primera palabra a tu
-                vocabulario personal.
-              </p>
+              <Link
+                href="/dashboard/vocabulary"
+                className="mt-3 inline-block text-sm font-bold text-cyan-400"
+              >
+                Agregar mi primera palabra →
+              </Link>
             </div>
           ) : (
-            <div className="mt-6 divide-y divide-white/10">
-              {recentWords.map((entry) => (
+            <div className="mt-5 space-y-2">
+              {recentVocabulary.map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-center justify-between gap-4 py-4"
+                  className="flex items-center justify-between gap-4 rounded-2xl bg-slate-950/50 px-4 py-3"
                 >
-                  <div>
-                    <p className="text-lg font-bold">
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-white">
                       {entry.word}
                     </p>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      {entry.translation}
-                    </p>
+                    {entry.alternativeTranslation && (
+                      <p className="mt-0.5 truncate text-xs text-slate-600">
+                        También:{" "}
+                        {entry.alternativeTranslation}
+                      </p>
+                    )}
                   </div>
 
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${
-                      entry.isLearned
-                        ? "bg-emerald-400/10 text-emerald-300"
-                        : "bg-cyan-400/10 text-cyan-300"
-                    }`}
-                  >
-                    {entry.isLearned
-                      ? "Aprendida"
-                      : "Pendiente"}
-                  </span>
+                  <p className="shrink-0 text-sm font-semibold text-teal-300">
+                    {entry.translation}
+                  </p>
                 </div>
               ))}
             </div>
           )}
-        </article>
-
-        <article className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-emerald-500/15 to-cyan-500/10 p-6 sm:p-8">
-          <p className="font-semibold text-teal-300">
-            Próximo objetivo
-          </p>
-
-          <h2 className="mt-3 text-3xl font-black">
-            Construye tu diccionario personal
-          </h2>
-
-          <p className="mt-4 leading-7 text-slate-300">
-            Guarda palabras nuevas, su traducción,
-            pronunciación y ejemplos para repasarlas
-            cuando quieras.
-          </p>
-
-          <Link
-            href="/dashboard/vocabulary"
-            className="mt-8 inline-flex rounded-2xl bg-white px-6 py-3 font-bold text-slate-950 transition hover:-translate-y-0.5"
-          >
-            Ir a vocabulario
-          </Link>
-        </article>
+        </div>
       </section>
     </main>
+  );
+}
+
+type DashboardStatProps = {
+  value: number;
+  label: string;
+  detail: string;
+  symbol: string;
+};
+
+function DashboardStat({
+  value,
+  label,
+  detail,
+  symbol,
+}: DashboardStatProps) {
+  return (
+    <article className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-3xl font-black text-white">
+            {value}
+          </p>
+
+          <p className="mt-1 font-bold text-slate-300">
+            {label}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            {detail}
+          </p>
+        </div>
+
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/10 font-black text-cyan-300">
+          {symbol}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+type QuickActionProps = {
+  href: string;
+  symbol: string;
+  title: string;
+  description: string;
+};
+
+function QuickAction({
+  href,
+  symbol,
+  title,
+  description,
+}: QuickActionProps) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-2xl border border-white/10 bg-slate-950/40 p-4 transition hover:-translate-y-0.5 hover:border-cyan-400/20 hover:bg-cyan-400/5"
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 font-black text-cyan-300">
+        {symbol}
+      </div>
+
+      <p className="mt-4 font-bold text-white">
+        {title}
+      </p>
+
+      <p className="mt-1 text-xs leading-5 text-slate-500">
+        {description}
+      </p>
+
+      <p className="mt-3 text-xs font-bold text-cyan-400 opacity-0 transition group-hover:opacity-100">
+        Abrir →
+      </p>
+    </Link>
   );
 }
