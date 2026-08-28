@@ -19,7 +19,10 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      <DashboardSidebar />  
+      <DashboardSidebar
+        userName={session.user.name ?? "Usuario"}
+        userEmail={session.user.email ?? ""}
+      />
 
       <main className="min-h-screen lg:pl-[17rem]">
         <div className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-6 lg:px-6 xl:px-8">
